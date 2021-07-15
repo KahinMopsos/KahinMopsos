@@ -1,0 +1,152 @@
+///////////////////////////////////////////////////////////////////////////
+// Important:It's not compatible with A7.
+//_______________________________________
+// Radial progress bar for 3dgs (15.07.2021)
+// Arranged by Emre. 
+// Sources: 
+//	https://www.shadertoy.com/view/XtKXDz
+//	https://opserver.de/ubb7/ubbthreads.php?ubb=showflat&Number=457514
+///////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////
+#include <acknex.h>
+#include <default.c>
+///////////////////////////////
+
+
+BMAP* barmap="#256x256x32";
+BMAP* barmap2="#256x256x32";
+
+PANEL* barpan =
+{
+	bmap=barmap;
+	flags=SHOW;
+}
+MATERIAL* rad_mat =
+{
+	effect="
+	float pi = 3.141592;
+	//panel bmap
+	Texture TargetMap;
+	sampler2D Texture1 = sampler_state { texture = <TargetMap>; MipFilter = Linear;	};
+
+
+	//health 
+	float health_var;
+	//to determine the end of the bar
+	float maximum_health_var;
+
+	//circle inner space
+	float inner_space_var;
+	//circle outer space 
+	float outer_space_var;
+
+	//for 90 degree rotation.
+	float2x2 rot;
+
+	float4 radial_bar( float2 Tex : TEXCOORD0 ) : COLOR0 
+	{
+
+
+
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		//rotate texture 90 degree--> from https://opserver.de/ubb7/ubbthreads.php?ubb=showflat&Number=457514
+		float s = sin(radians(90)); 
+		float c = cos(radians(90));
+		float2x2 rotMatrix = float2x2(c,-s,s,c);
+		float2 rotated_tex = Tex -=0.5;
+		rotated_tex = mul(Tex ,rotMatrix);
+		rotated_tex += 0.5;
+		////////////////////////////////////////////////////////////////////////////////////////////////////////
+		
+		
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////
+		//radial progress--> from: https://www.shadertoy.com/view/XtKXDz
+		float mytime=0;
+		
+		float2 uv = rotated_tex.xy / 1.0;
+		float x = (uv.x - 0.5) * 2.0;
+		float y = (uv.y - 0.5) * 2.0;
+		float d = sqrt(x * x + y * y);
+		float4 color = tex2D(Texture1,Tex.xy+0.5);
+
+
+		if(d > inner_space_var && d < outer_space_var) {
+			float theta = atan2(y, x) / pi;
+			float b = (theta * 0.5) + 0.5;
+			
+			mytime=health_var/maximum_health_var;
+			if(b < mytime)
+			{
+				//healtbar color
+				color = float4(
+				/*red*/1-((health_var/maximum_health_var)), 
+				/*green*/(health_var/maximum_health_var),
+				/*blue*/ 0, 
+				/*alpha*/1);
+			}
+			else
+			{
+				color= float4(0,0,0,1);
+				
+			}
+
+		}
+
+		return color;
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	}
+	technique RadialBar 
+	{
+		pass p1 
+		{
+			
+			VertexShader = null;
+			PixelShader = compile ps_2_0 radial_bar();
+		}
+	}
+	";
+}
+
+
+//health variable.
+var health=100;
+
+//to determine the end of the bar. You can set whatever you want
+var maximum_health=100;
+
+//circle inner space
+var inner_space=0.6;
+//circle outer space 
+var outer_space=0.8;
+
+function main()
+{
+
+	wait(3);
+	
+	//level_load is required for bmap_process to work.
+	level_load("");
+	
+	var timerx=0;
+	while (1)
+	{
+		
+		bmap_process(barmap,barmap2,rad_mat);
+		
+		
+		//animation
+		timerx += 2*time_step;
+		if(timerx>200)timerx=0;
+		var x = sinv(timerx);
+		health = pow(abs(x),0.5)*sign(x)*maximum_health+1;
+		health=clamp(health,0,maximum_health);
+		
+		
+		
+		//digit
+		draw_text(str_printf(NULL, "HEALTH: %d", (long)health), 80, 125, COLOR_WHITE);
+
+		wait(1);
+	}
+}
